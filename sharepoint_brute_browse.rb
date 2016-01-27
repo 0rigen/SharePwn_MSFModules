@@ -11,7 +11,6 @@ require 'rex/proto/http'
 require 'msf/core'
 require 'thread'
 
-
 class Metasploit3 < Msf::Auxiliary
 
   include Msf::Exploit::Remote::HttpClient
@@ -23,21 +22,26 @@ class Metasploit3 < Msf::Auxiliary
     super(update_info(info,
       'Name'   		=> 'SharePwn:BruteBrowse - SharePoint Resource Locator',
       'Description'	=> %q{
-        This SharePwn module finds potential SharePoint resources via brute force
-        browsing.
+        This SharePwn module searches for common SharePoint services, directories, and files via brute force
+        browsing.  This information can be used to test misconfigured permissions on SharePoint sites.
+        To set an HTTP Error Code other than '404', use the Advanced Option 'ErrorCode'.
       },
-      'Author' 		=> 'J Parsons "0rigen"',
+      'Author' 		=> 'J Parsons "0rigen" <0rigen [at] 0rigen.net>',
       'License'		=> MSF_LICENSE))
 
     register_options(
       [
-        OptString.new('PATH', [ true,  "The target's SharePoint path", '/']),
-        OptString.new('ErrorCode', [ false, 'ErrorCode for non-existent resources (usually 404)', '404']),
+        OptString.new('PATH', [ false,  "The target's SharePoint path, if not at webroot", '']),
         OptPath.new('DICTIONARY',   [ false, "Path of SP resource dictionary",
-            File.join(Msf::Config.data_directory, "sharepwn", "brute_list.txt")
+            File.join(Msf::Config.data_directory, "sharepwn", "browse_list.txt")
           ]
         )
 
+      ], self.class)
+
+    register_advanced_options(
+      [
+        OptString.new('ErrorCode', [ false, 'ErrorCode for non-existent resources (usually 404)', '404'])
       ], self.class)
 
   end
@@ -47,16 +51,17 @@ class Metasploit3 < Msf::Auxiliary
     ecode = nil
     emesg = nil
 
-    #DEBUG
-    print("#{ip}")
-
     tpath = normalize_uri(datastore['PATH'])
-    if tpath[-1,1] != '/'
+
+    if (tpath[-1,1] != '/')
       tpath += '/'
     end
 
-    # DEBUG
-    #print_status("Constructed " + tpath)
+    # If it's just the root path, then don't bother with thism, otherwise we'll double up slashes
+    if(tpath == '/')
+      tpath = ""
+    end
+
 
     if datastore['ErrorCode']
     	ecode = datastore['ErrorCode'].to_i
@@ -89,20 +94,31 @@ class Metasploit3 < Msf::Auxiliary
 
           testfdir = testf
 
-          #DEBUG
-          #print_status("Requesting " + (tpath + testfdir))
-
-          res = send_request_cgi({
-            'uri'  		=>  tpath+testfdir,
+          # Timeout = 3, Redirect depth = 2
+          res = send_request_cgi!({
+            'uri'  		=>  tpath + testfdir,
             'method'   	=> 'GET',
             'ctype'		=> 'text/html'
-          }, 20)
+          }, 20, 2)
 
-          #DEBUG
-          #print_status("#{res.code}")
+          return if not res
 
-          if(res.code.to_i == 302)
-          	print_status("Redirected #{wmap_base_url}#{tpath}#{testfdir} #{res.code} (#{wmap_target_host})")
+          if res.body.include? "error" # SP usually just uses error.aspx rather than a 404
+            next
+          else
+            begin
+            # Status was redirected
+            if(res.code.to_i == 302)
+            	print_status("Redirected #{wmap_base_url}#{tpath}#{testfdir} <Response:#{res.code}>")
+            end
+            # Status is not redirect or not found
+            if(res.code.to_i != 302) and (res.code.to_i != ecode) 
+                print_status("Found #{wmap_base_url}#{tpath}#{testfdir} <Response:#{res.code}>")
+            end
+
+            if (res.code.to_i == 401) or (res.code.to_i == 403) or res.target_uri.include? "error"
+                print_status("#{wmap_base_url}#{tpath}#{testfdir} requires authentication: #{res.headers['WWW-Authenticate']}")
+            end
           end
 
             report_web_vuln(
@@ -120,13 +136,7 @@ class Metasploit3 < Msf::Auxiliary
               :description  => 'Directoy found.',
               :name   => 'directory'
             )
-            if(res.code.to_i != 302) and (res.code.to_i != ecode)
-            	print_status("Found #{wmap_base_url}#{tpath}#{testfdir} #{res.code} (#{wmap_target_host})")
-            end
-
-            if res.code.to_i == 401 or res.code.to_i == 403
-              print_status("#{wmap_base_url}#{tpath}#{testfdir} requires authentication: #{res.headers['WWW-Authenticate']}")
-
+        
               report_note(
                 :host	=> ip,
                 :port	=> rport,
@@ -144,4 +154,4 @@ class Metasploit3 < Msf::Auxiliary
       end
       t.map{|x| x.join }
     end
-  end
+end
