@@ -27,7 +27,8 @@ class Metasploit3 < Msf::Auxiliary
         To set an HTTP Error Code other than '404', use the Advanced Option 'ErrorCode'.
       },
       'Author' 		=> 'J Parsons "0rigen" <0rigen [at] 0rigen.net>',
-      'License'		=> MSF_LICENSE))
+      'License'		=> MSF_LICENSE)
+    )
 
     register_options(
       [
@@ -116,7 +117,7 @@ class Metasploit3 < Msf::Auxiliary
                 print_status("Found #{wmap_base_url}#{tpath}#{testfdir} <Response:#{res.code}>")
             end
 
-            if (res.code.to_i == 401) or (res.code.to_i == 403) or res.target_uri.include? "error"
+            if (res.code.to_i == 401) or (res.code.to_i == 403)
                 print_status("#{wmap_base_url}#{tpath}#{testfdir} requires authentication: #{res.headers['WWW-Authenticate']}")
             end
           end

@@ -13,7 +13,7 @@ class Metasploit3 < Msf::Auxiliary
 
   def initialize(info = {})
     super(update_info(info,
-      'Name'   		=> 'SharePwn:BruteBrowse - SharePoint Server Version Identifier',
+      'Name'   		=> 'SharePwn:VersionID - SharePoint & Server Version Identifier',
       'Description'	=> %q{
         This SharePwn module performs an initial interrogation of a SharePoint server to discover
         the installed SharePoint version, as well as the current Health Score and other server information.
